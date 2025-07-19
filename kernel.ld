@@ -7,7 +7,7 @@ SECTIONS {
         KEEP(*(.text.boot));
         *(.text .text.*);
     }
-    
+
     .rodata : ALIGN(4) {
         *(.rodata .rodata.*);
     }
