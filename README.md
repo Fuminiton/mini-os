@@ -1,10 +1,5 @@
 # Mini-OS Project
 
-
-## Table of Contents
-[Setting](## Setting)
-[Directory Structure](## Directory Structure)
-
 ## Setting
 
 ```bash
@@ -14,14 +9,20 @@ curl -LO https://github.com/qemu/qemu/raw/v8.0.4/pc-bios/opensbi-riscv32-generic
 ```
 
 ## Directory Structure
-
 ```bash
 .
+├── common.c
+├── common.h
 ├── disk
 ├── kernel.c
-├── kernel.elf
+├── kernel.h
 ├── kernel.ld
 ├── README.md
 └── run.sh
 ```
 
+## Memo
+```bash
+# check address
+llvm-nm kernel.elf | grep __free_ram
+```
