@@ -2,8 +2,8 @@
 
 
 ## Table of Contents
-1. [Setting](# setting)
-2. [Directory Structure](# directory-structure)
+[Setting](# setting)
+[Directory Structure](# directory-structure)
 
 ## Setting
 
