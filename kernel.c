@@ -5,6 +5,12 @@ typedef unsigned char uint8_t;
 typedef unsigned int uint32_t;
 typedef uint32_t size_t;
 
+struct process procs[PROCS_MAX];
+struct process *current_proc;
+struct process *idle_proc;
+struct process *proc_a;
+struct process *proc_b;
+
 extern char __bss[], __bss_end[], __stack_top[];
 extern char __free_ram[], __free_ram_end[];
 
@@ -24,8 +30,6 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4, lo
                          : "memory");
     return (struct sbiret){.error = a0, .value = a1};
 }
-
-struct process procs[PROCS_MAX];
 
 __attribute__((naked)) void switch_context(uint32_t *prev_sp, uint32_t *next_sp) {
     __asm__ __volatile__(
@@ -114,21 +118,42 @@ void handle_trap(struct trap_frame *f) {
     PANIC("unexpected trap scause=%x, stval=%x, spec=%x\n", scause, stval, user_pc);
 }
 
-
 void delay(void) {
-    for (int i = 0; i < 30000000; i++) {
+    for (int i = 0; i < 300000000; i++) {
         __asm__ __volatile__("nop");
     }
 }
 
-struct process *proc_a;
-struct process *proc_b;
+void yield(void) {
+    struct process *next = idle_proc;
+    for (int i = 0; i < PROCS_MAX; i++) {
+        struct process *proc = &procs[(current_proc->pid + i) % PROCS_MAX];
+        if (proc->state == PROC_RUNNABLE && proc->pid > 0) {
+            next = proc;
+            break;
+        }
+    }
+
+    if (next == current_proc) {
+        return ;
+    }
+
+    __asm__ __volatile__(
+        "csrw sscratch, %[sscratch]\n"
+        :
+        : [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
+    );
+
+    struct process *prev = current_proc;
+    current_proc = next;
+    switch_context(&prev->sp, &next->sp);
+}
 
 void proc_a_entry(void) {
     printf("starting processing A\n");
     while (1) {
         putchar('A');
-        switch_context(&proc_a->sp, &proc_b->sp);
+        yield();
         delay();
     }
 }
@@ -137,17 +162,17 @@ void proc_b_entry(void) {
     printf("starting processing B\n");
     while (1) {
         putchar('B');
-        switch_context(&proc_b->sp, &proc_a->sp);
+        yield();
         delay();
     }
 }
-
 
 __attribute__((naked))
 __attribute__((aligned(4)))
 void kernel_entry(void) {
     __asm__ __volatile__(
-        "csrw sscratch, sp\n"
+        "csrrw sp, sscratch, sp\n"
+
         "addi sp, sp, -4 * 31\n"
         "sw ra, 4 * 0(sp)\n"
         "sw gp, 4 * 1(sp)\n"
@@ -182,6 +207,9 @@ void kernel_entry(void) {
 
         "csrr a0, sscratch\n"
         "sw a0, 4 * 30(sp)\n"
+
+        "addi a0, sp, 4 * 31\n"
+        "csrw sscratch, a0\n"
 
         "mv a0, sp\n"
         "call handle_trap\n"
@@ -224,6 +252,10 @@ void kernel_entry(void) {
 void kernel_main(void) {
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
+    printf("\n\n");
+
+    WRITE_CSR(stvec, (uint32_t) kernel_entry);
+
     // Memory Management Test
     // paddr_t paddr0 = alloc_pages(2);
     // paddr_t paddr1 = alloc_pages(1);
@@ -231,10 +263,14 @@ void kernel_main(void) {
     // printf("alloc_pages test: paddr1=%x\n", paddr1);
 
     // Multi Tasks Test
+    idle_proc = create_process((uint32_t) NULL);
+    idle_proc->pid = 0;
+    current_proc = idle_proc;
+
     proc_a = create_process((uint32_t) proc_a_entry);
     proc_b = create_process((uint32_t) proc_b_entry);
-    proc_a_entry();
 
+    yield();
     PANIC("unreachable here!");
 }
 
