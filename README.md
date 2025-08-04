@@ -11,14 +11,17 @@ curl -LO https://github.com/qemu/qemu/raw/v8.0.4/pc-bios/opensbi-riscv32-generic
 ## Directory Structure
 ```bash
 .
+├── README.md
 ├── common.c
 ├── common.h
-├── disk
 ├── kernel.c
 ├── kernel.h
 ├── kernel.ld
-├── README.md
-└── run.sh
+├── run.sh
+├── shell.c
+├── user.c
+├── user.h
+└── user.ld
 ```
 
 ## Memo
